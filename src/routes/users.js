@@ -1,10 +1,11 @@
 const express = require("express");
 const userAuth = require("../middlewares/auth");
 const User = require("../models/user");
+const validateObjectId = require("../middlewares/validateObjectId");
 
 const router = express.Router();
 
-router.get("/", userAuth, async (req, res, next) => {
+router.get("/", userAuth, validateObjectId, async (req, res, next) => {
   try {
     const users = await User.find().select("-password");
 
@@ -17,7 +18,7 @@ router.get("/", userAuth, async (req, res, next) => {
   }
 });
 
-router.get("/:id", userAuth, async (req, res, next) => {
+router.get("/:id", userAuth, validateObjectId, async (req, res, next) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id).select("-password");
@@ -38,7 +39,7 @@ router.get("/:id", userAuth, async (req, res, next) => {
   }
 });
 
-router.patch("/:id", userAuth, async (req, res, next) => {
+router.patch("/:id", userAuth, validateObjectId, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { firstName, lastName } = req.body;
@@ -94,7 +95,7 @@ router.patch("/:id", userAuth, async (req, res, next) => {
   }
 });
 
-router.delete("/:id", userAuth, async (req, res, next) => {
+router.delete("/:id", userAuth, validateObjectId, async (req, res, next) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
