@@ -5,22 +5,14 @@ const validateObjectId = require("../middlewares/validateObjectId");
 
 const router = express.Router();
 
-router.get("/", userAuth, validateObjectId, async (req, res, next) => {
+router.get("/", userAuth, async (req, res, next) => {
   try {
-    // const { page, limit } = req.params;
-    const page = Number(req.query.page);
-    const limit = Number(req.query.limit);
-    const sortedOrder = req.query.order === desc ? -1 : 1;
-    const allowedField = ["createdAt", "firstName", "lastName"];
-    const sortedField = req.query.sort || "createdAt";
+    const { search = "", role, sort = "createdAt", order = "desc" } = req.query;
 
-    if (!allowedField.includes(sortedField)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid Sort Field",
-      });
-    }
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
 
+    // 1. Pagination validation
     if (!Number.isInteger(page) || page < 1) {
       return res.status(400).json({
         success: false,
@@ -31,26 +23,72 @@ router.get("/", userAuth, validateObjectId, async (req, res, next) => {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       return res.status(400).json({
         success: false,
-        message: "Limit must be an integer between 1 and 100",
+        message: "Limit must be between 1 and 100",
       });
     }
+
+    // 2. Sort validation
+    const allowedSortFields = ["createdAt", "firstName", "lastName"];
+
+    if (!allowedSortFields.includes(sort)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid sort field",
+      });
+    }
+
+    const sortOrder = order === "desc" ? -1 : 1;
+
+    // 3. Search filter
+    const filter = {};
+
+    if (search.trim()) {
+      filter.$or = [
+        {
+          firstName: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+        {
+          lastName: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+      ];
+    }
+
+    // Filter
+    if (role) {
+      filter.role = role;
+    }
+
+    // 4. Calculate skip
     const skip = (page - 1) * limit;
-    const users = await User.find()
+
+    // 5. Get users
+    const users = await User.find(filter)
       .select("-password")
-      .sort({ [sortedField]: sortedOrder })
+      .sort({ [sort]: sortOrder })
       .skip(skip)
       .limit(limit);
-    const total = await User.countDocuments();
+
+    // 6. Total matching users
+    const total = await User.countDocuments(filter);
+
     const totalPages = Math.ceil(total / limit);
 
     return res.status(200).json({
       success: true,
-      result: users,
+      users,
       pagination: {
         page,
         limit,
         total,
         totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
       },
     });
   } catch (error) {
